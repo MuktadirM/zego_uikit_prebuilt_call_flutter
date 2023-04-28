@@ -5,7 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 // Package imports:
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_screenutil_zego/flutter_screenutil_zego.dart';
 import 'package:zego_uikit/zego_uikit.dart';
 
 // Project imports:
@@ -283,6 +283,7 @@ class _ZegoBottomMenuBarState extends State<ZegoBottomMenuBar> {
       case ZegoMenuBarButtonName.showMemberListButton:
         return ZegoMemberListButton(
           config: widget.config.memberListConfig,
+          avatarBuilder: widget.config.avatarBuilder,
           buttonSize: buttonSize,
           iconSize: iconSize,
         );

@@ -2,18 +2,20 @@
 import 'dart:async';
 import 'dart:convert';
 
-// Flutter imports:
-import 'package:flutter_callkit_incoming/entities/call_event.dart';
-
 // Package imports:
+import 'package:flutter_callkit_incoming/entities/call_event.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zego_uikit/zego_uikit.dart';
+import 'package:zego_zpns/zego_zpns.dart';
 
 // Project imports:
 import 'package:zego_uikit_prebuilt_call/src/call_invitation/callkit/callkit_incoming_wrapper.dart';
 import 'package:zego_uikit_prebuilt_call/src/call_invitation/internal/defines.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
-import 'package:zego_zpns/zego_zpns.dart';
 
+/// [Android] Silent Notification event notify
+///
 /// Note: @pragma('vm:entry-point') must be placed on a function to indicate that it can be parsed, allocated, or called directly from native or VM code in AOT mode.
 @pragma('vm:entry-point')
 Future<void> onBackgroundMessageReceived(ZPNsMessage message) async {
@@ -71,10 +73,14 @@ Future<void> onBackgroundMessageReceived(ZPNsMessage message) async {
       case Event.ACTION_CALL_START:
         break;
       case Event.ACTION_CALL_ACCEPT:
+
+        /// android only receive onBackgroundMessageReceived if App BE KILLED,
+        /// so [ACTION_CALL_ACCEPT] event should be ignore,
+        /// deal in [onInvitationReceived] supply again by ZIM when app re-start
         break;
       case Event.ACTION_CALL_DECLINE:
 
-        /// todo@yuyj lack of invitationID
+        /// todo@yuyj [onBackgroundMessageReceived] lack of invitationID
         // ZegoUIKit().getSignalingPlugin().refuseInvitationByInvitationID(
         //       invitationID: '',
         //       data: '{"reason":"decline"}',
@@ -98,6 +104,11 @@ Future<void> onBackgroundMessageReceived(ZPNsMessage message) async {
         break;
     }
   });
+
+  /// cache
+  final prefs = await SharedPreferences.getInstance();
+  prefs.setString(CallKitCalIDCacheKey, invitationInternalData.callID);
+
   await showCallkitIncoming(
     caller: ZegoUIKitUser(id: '', name: inviterName),
     callType: callType,
@@ -105,6 +116,7 @@ Future<void> onBackgroundMessageReceived(ZPNsMessage message) async {
   );
 }
 
+/// [iOS] VoIP event callback
 void onIncomingPushReceived(Map extras, UUID uuid) {
   ZegoLoggerService.logInfo(
     'on incoming push received: extras:$extras',
@@ -112,8 +124,6 @@ void onIncomingPushReceived(Map extras, UUID uuid) {
     subTag: 'background message',
   );
 
-  // clearAllCallKitCalls();
-  //
   final payload = extras['payload'] as String? ?? '';
   final extendedMap = jsonDecode(payload) as Map<String, dynamic>;
   final inviterName = extendedMap['inviter_name'] as String;
@@ -121,17 +131,15 @@ void onIncomingPushReceived(Map extras, UUID uuid) {
       ZegoCallType.voiceCall;
   final invitationInternalData =
       InvitationInternalData.fromJson(extendedMap['data'] as String);
-  // showCallkitIncoming(
-  //   caller: ZegoUIKitUser(id: '', name: inviterName),
-  //   callType: callType,
-  //   invitationInternalData: invitationInternalData,
-  // );
 
-  /// cache and wait for page manger onInvitationReceive
+  /// cache callkit param,
+  /// and wait for the onInvitationReceive callback of page manger
   final callKitParam = makeSimpleCallKitParam(
     caller: ZegoUIKitUser(id: '', name: inviterName),
     callType: callType,
     invitationInternalData: invitationInternalData,
   );
-  ZegoUIKitPrebuiltCallInvitationService().callKitParams = callKitParam;
+  ZegoUIKitPrebuiltCallInvitationService().callKitCallID = callKitParam.handle;
+
+  ZegoUIKit().getSignalingPlugin().activeAudioByCallKit();
 }
